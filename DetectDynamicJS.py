@@ -27,6 +27,7 @@ try:
     from array import array
     from time import sleep
     import difflib
+    import re
 except ImportError:
     print "Failed to load dependencies. This issue maybe caused by using an unstable Jython version."
 
@@ -71,7 +72,6 @@ class BurpExtender(IBurpExtender, IScannerCheck, IExtensionStateListener, IHttpR
         # This is, because the insertionPoint idea doesn't work well
         # for this test.
         scan_issues = []
-
         if not self.isGet(baseRequestResponse.getRequest()):
             baseRequestResponse = self.switchMethod(baseRequestResponse)
         if (not self.isScannableRequest(baseRequestResponse) or
@@ -79,20 +79,39 @@ class BurpExtender(IBurpExtender, IScannerCheck, IExtensionStateListener, IHttpR
             self.isProtected(baseRequestResponse)):
             return None
         newRequestResponse = self.sendUnauthenticatedRequest(baseRequestResponse)
-        issue = self.compareResponses(newRequestResponse, baseRequestResponse)
-        if not issue:
-            return None
-        # If response is script, check if script is dynamic
-        if self.isScript(newRequestResponse):
-            # sleep, in case this is a generically time stamped script
-            sleep(1)
-            secondRequestResponse = self.sendUnauthenticatedRequest(baseRequestResponse)
-            isDynamic = self.compareResponses(secondRequestResponse, newRequestResponse)
-            if isDynamic:
-                issue = self.reportDynamicOnly(newRequestResponse, baseRequestResponse,
-                                               secondRequestResponse)
-        scan_issues.append(issue)
-        return scan_issues
+        if(self.isScannableRequest(newRequestResponse)):
+            issue = self.compareResponses(newRequestResponse, baseRequestResponse)
+            if not issue:
+                return None
+            # If response is script, check if script is dynamic
+            if self.isScript(newRequestResponse):
+                # sleep, in case this is a generically time stamped script
+                sleep(1)
+                secondRequestResponse = self.sendUnauthenticatedRequest(baseRequestResponse)
+                isDynamic = self.compareResponses(secondRequestResponse, newRequestResponse)
+                if isDynamic:
+                    issue = self.reportDynamicOnly(newRequestResponse, baseRequestResponse,
+                                                   secondRequestResponse)
+            scan_issues.append(issue)
+            return scan_issues
+        else:
+            if(self.hasScriptContent(newRequestResponse)):
+                issue = self.compareResponses(newRequestResponse, baseRequestResponse)
+                if not issue:
+                    return None
+
+                if self.isScript(newRequestResponse):
+                    # sleep, in case this is a generically time stamped script
+                    sleep(1)
+                    secondRequestResponse = self.sendUnauthenticatedRequest(baseRequestResponse)
+                    isDynamic = self.compareResponses(secondRequestResponse, newRequestResponse)
+                    if isDynamic:
+                        issue = self.reportDynamicOnly(newRequestResponse, baseRequestResponse,
+                                                       secondRequestResponse)
+                    scan_issues.append(issue)
+                return scan_issues
+            else:
+                return None
 
     def sendUnauthenticatedRequest(self, requestResponse):
         """
@@ -341,6 +360,35 @@ class BurpExtender(IBurpExtender, IScannerCheck, IExtensionStateListener, IHttpR
         else:
             return 0
 
+    def has401StatusCode(self, requestResponse):
+        """
+        Checks if the status code of the request is 401
+        """
+        response = requestResponse.getResponse()
+        responseInfo = self._helpers.analyzeResponse(response)
+        statusCode = responseInfo.getStatusCode()
+        return statusCode == 401
+
+    def hasScriptContent(self,requestResponse):
+        """
+        Checks if the response of the request contains the scipt content
+        """
+        nResponse = requestResponse.getResponse()
+        nResponseInfo = self._helpers.analyzeResponse(nResponse)
+        nBodyOffset = nResponseInfo.getBodyOffset()
+        nBody = nResponse.tostring()[nBodyOffset:]
+        first_char = nBody[0:1]
+        if(first_char in "[" or first_char in "{"):
+            return "first_char"
+        matchvar = re.match( r'(.*)\s*(var|let|const) ([a-zA-Z])+\s*=(.*)|(.*)\s*(window.) ([a-zA-Z])+\s*=(.*)', nBody,re.M|re.I)
+        matchfunction=re.match( r'(.*)\s*function\((.*)\)(.*)', nBody,re.M|re.I)
+
+        if matchvar:
+           return matchvar
+        if matchfunction:
+           return matchfunction
+        else:
+           return None
 
 class ScanIssue(IScanIssue):
 
