@@ -79,7 +79,9 @@ class BurpExtender(IBurpExtender, IScannerCheck, IExtensionStateListener, IHttpR
             self.isProtected(baseRequestResponse)):
             return None
         newRequestResponse = self.sendUnauthenticatedRequest(baseRequestResponse)
-        if(self.isScannableRequest(newRequestResponse)):
+        if((not (self.isScannableRequest(newRequestResponse)) and
+            self.hasScriptContent(newRequestResponse)) or
+            self.isScannableRequest(newRequestResponse)):
             issue = self.compareResponses(newRequestResponse, baseRequestResponse)
             if not issue:
                 return None
@@ -92,26 +94,8 @@ class BurpExtender(IBurpExtender, IScannerCheck, IExtensionStateListener, IHttpR
                 if isDynamic:
                     issue = self.reportDynamicOnly(newRequestResponse, baseRequestResponse,
                                                    secondRequestResponse)
-            scan_issues.append(issue)
+                scan_issues.append(issue)
             return scan_issues
-        else:
-            if(self.hasScriptContent(newRequestResponse)):
-                issue = self.compareResponses(newRequestResponse, baseRequestResponse)
-                if not issue:
-                    return None
-
-                if self.isScript(newRequestResponse):
-                    # sleep, in case this is a generically time stamped script
-                    sleep(1)
-                    secondRequestResponse = self.sendUnauthenticatedRequest(baseRequestResponse)
-                    isDynamic = self.compareResponses(secondRequestResponse, newRequestResponse)
-                    if isDynamic:
-                        issue = self.reportDynamicOnly(newRequestResponse, baseRequestResponse,
-                                                       secondRequestResponse)
-                    scan_issues.append(issue)
-                return scan_issues
-            else:
-                return None
 
     def sendUnauthenticatedRequest(self, requestResponse):
         """
