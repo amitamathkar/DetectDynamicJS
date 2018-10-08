@@ -74,7 +74,8 @@ class BurpExtender(IBurpExtender, IScannerCheck, IExtensionStateListener, IHttpR
         scan_issues = []
         if not self.isGet(baseRequestResponse.getRequest()):
             baseRequestResponse = self.switchMethod(baseRequestResponse)
-        if (not self.isScannableRequest(baseRequestResponse) or
+        if ((not (self.isScannableRequest(baseRequestResponse)) and
+            self.hasScriptContent(baseRequestResponse)) or
             not self.isScript(baseRequestResponse) or
             self.isProtected(baseRequestResponse)):
             return None
