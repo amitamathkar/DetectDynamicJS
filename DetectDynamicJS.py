@@ -345,18 +345,9 @@ class BurpExtender(IBurpExtender, IScannerCheck, IExtensionStateListener, IHttpR
         else:
             return 0
 
-    def has401StatusCode(self, requestResponse):
-        """
-        Checks if the status code of the request is 401
-        """
-        response = requestResponse.getResponse()
-        responseInfo = self._helpers.analyzeResponse(response)
-        statusCode = responseInfo.getStatusCode()
-        return statusCode == 401
-
     def hasScriptContent(self,requestResponse):
         """
-        Checks if the response of the request contains the scipt content
+        Checks if the response of the request contains the script content
         """
         nResponse = requestResponse.getResponse()
         nResponseInfo = self._helpers.analyzeResponse(nResponse)
